@@ -23,10 +23,7 @@ import (
 )
 
 func init() {
-	// Shortcut for sub-conversions. TODO: This should possibly be refactored
-	// such that this convert function is passed to each conversion func.
-	Convert := runtime.Convert
-	runtime.AddConversionFuncs(
+	runtime.DefaultScheme.AddConversionFuncs(
 		// EnvVar's Key is deprecated in favor of Name.
 		func(in *newer.EnvVar, out *EnvVar) error {
 			out.Value = in.Value
