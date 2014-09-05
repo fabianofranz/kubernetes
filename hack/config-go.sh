@@ -117,7 +117,6 @@ kube::default_build_targets() {
   echo "cmd/proxy"
   echo "cmd/apiserver"
   echo "cmd/controller-manager"
-  echo "cmd/e2e"
   echo "cmd/kubelet"
   echo "cmd/kubecfg"
   echo "cmd/kubectl"
