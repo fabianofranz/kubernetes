@@ -69,6 +69,44 @@
 			"Rev": "aef70dacbc78771e35beb261bb3a72986adf7906"
 		},
 		{
+			"ImportPath": "github.com/kr/text",
+			"Rev": "6807e777504f54ad073ecef66747de158294b639"
+		},
+		{
+			"ImportPath": "github.com/mitchellh/goamz/aws",
+			"Rev": "9cad7da945e699385c1a3e115aa255211921c9bb"
+		},
+		{
+			"ImportPath": "github.com/mitchellh/goamz/ec2",
+			"Rev": "9cad7da945e699385c1a3e115aa255211921c9bb"
+		},
+		{
+			"ImportPath": "github.com/mitchellh/mapstructure",
+			"Rev": "740c764bc6149d3f1806231418adb9f52c11bcbf"
+		},
+		{
+			"ImportPath": "github.com/racker/perigee",
+			"Comment": "v0.0.0-18-g0c00cb0",
+			"Rev": "0c00cb0a026b71034ebc8205263c77dad3577db5"
+		},
+		{
+			"ImportPath": "github.com/rackspace/gophercloud",
+			"Comment": "v0.1.0-31-ge13cda2",
+			"Rev": "e13cda260ce48d63ce816f4fa72b6c6cd096596d"
+		},
+		{
+			"ImportPath": "github.com/skratchdot/open-golang/open",
+			"Rev": "ba570a111973b539baf23c918213059543b5bb6e"
+		},
+		{
+			"ImportPath": "github.com/spf13/cobra",
+			"Rev": "b1e90a7943957b51bb96a13b44b844475bcf95c0"
+		},
+		{
+			"ImportPath": "github.com/spf13/pflag",
+			"Rev": "463bdc838f2b35e9307e91d480878bda5fff7232"
+		},
+		{
 			"ImportPath": "github.com/stretchr/objx",
 			"Rev": "d40df0cc104c06eae2dfe03d7dddb83802d52f9a"
 		},
