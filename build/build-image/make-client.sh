@@ -18,6 +18,19 @@
 
 set -e
 
-source $(dirname $0)/common.sh
+platforms=(linux/amd64 $KUBE_CROSSPLATFORMS)
+targets=("${client_targets[@]}")
 
-make-binaries "$@"
+if [[ $# -gt 0 ]]; then
+  targets=("$@")
+fi
+
+for platform in "${platforms[@]}"; do
+  (
+    # Subshell to contain these exports
+    export GOOS=${platform%/*}
+    export GOARCH=${platform##*/}
+
+    kube::build::make_binaries "${targets[@]}"
+  )
+done

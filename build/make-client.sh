@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /bin/bash
 
 # Copyright 2014 Google Inc. All rights reserved.
 #
@@ -14,22 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This and builds all go components.
+# Make all of the client Kubernetes binaries for cross compile targets
+#
+# This makes the docker build image, builds the cross binaries and copies them
+# out of the docker container.
 
 set -e
 
 source $(dirname $0)/common.sh
 
-readonly CROSS_BINARIES="
-  kubecfg
-"
-
-for platform in ${KUBE_CROSSPLATFORMS}; do
-  (
-    export GOOS=${platform%/*}
-    export GOARCH=${platform##*/}
-    for binary in ${CROSS_BINARIES}; do
-      make-binaries "${binary}"
-    done
-  )
-done
+kube::build::verify_prereqs
+kube::build::build_image
+kube::build::run_build_command build/build-image/make-client.sh "$@"
+kube::build::copy_output
