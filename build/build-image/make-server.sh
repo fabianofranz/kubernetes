@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 # Copyright 2014 Google Inc. All rights reserved.
 #
@@ -14,15 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Make all of the Kubernetes binaries.
-#
-# This makes the docker build image, builds the binaries and copies them out
-# of the docker container.
+# This and builds all go components.
 
 set -e
 
-source $(dirname $0)/common.sh
+targets=("${server_targets[@]}")
+if [[ $# -gt 0 ]]; then
+  targets=("$@")
+fi
 
-verify-prereqs
-build-image
-run-build-command build/build-image/make-binaries.sh "$@"
+kube::build::make_binaries "${targets[@]}"

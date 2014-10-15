@@ -32,10 +32,29 @@ readonly KUBE_GO_PACKAGE="github.com/GoogleCloudPlatform/kubernetes"
 #
 # Note that here "LOCAL" is local to the docker daemon.  In the boot2docker case
 # this is still inside the VM.  We use the same directory in both cases though.
-readonly LOCAL_OUTPUT_DIR="${KUBE_REPO_ROOT}/_output/build"
-readonly REMOTE_OUTPUT_DIR="/go/src/${KUBE_GO_PACKAGE}/_output/build"
-readonly DOCKER_CONTAINER_NAME=kube-build
-readonly DOCKER_MOUNT="-v ${LOCAL_OUTPUT_DIR}:${REMOTE_OUTPUT_DIR}"
+readonly LOCAL_OUTPUT_ROOT="${KUBE_ROOT}/_output"
+readonly LOCAL_OUTPUT_BUILD="${LOCAL_OUTPUT_ROOT}/build"
+readonly LOCAL_OUTPUT_IMAGE_STAGING="${LOCAL_OUTPUT_ROOT}/images"
+readonly REMOTE_OUTPUT_ROOT="/go/src/${KUBE_GO_PACKAGE}/_output"
+readonly REMOTE_OUTPUT_DIR="${REMOTE_OUTPUT_ROOT}/build"
+readonly DOCKER_MOUNT_ARGS=(--volume "${LOCAL_OUTPUT_BUILD}:${REMOTE_OUTPUT_DIR}")
+
+readonly KUBE_CLIENT_BINARIES=(
+  kubecfg
+  kubectl
+)
+
+readonly KUBE_SERVER_BINARIES=(
+  apiserver
+  controller-manager
+  kubelet
+  proxy
+  scheduler
+)
+
+readonly KUBE_SERVER_PLATFORMS=(
+  linux/amd64
+)
 
 readonly KUBE_RUN_IMAGE_BASE="kubernetes"
 readonly KUBE_RUN_BINARIES="
