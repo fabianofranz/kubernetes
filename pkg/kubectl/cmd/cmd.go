@@ -171,6 +171,7 @@ func getKubeConfig(cmd *cobra.Command) *client.Config {
 		config.CAFile = firstNonEmptyString(getFlagString(cmd, "certificate-authority"), authInfo.CAFile)
 		config.CertFile = firstNonEmptyString(getFlagString(cmd, "client-certificate"), authInfo.CertFile)
 		config.KeyFile = firstNonEmptyString(getFlagString(cmd, "client-key"), authInfo.KeyFile)
+		config.BearerToken = authInfo.BearerToken
 		// For config.Insecure, the command line ALWAYS overrides the authInfo
 		// file, regardless of its setting.
 		if insecureFlag := getFlagBoolPtr(cmd, "insecure-skip-tls-verify"); insecureFlag != nil {
