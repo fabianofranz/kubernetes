@@ -36,6 +36,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 	"github.com/golang/glog"
+	"github.com/openshift/origin/Godeps/_workspace/src/github.com/skratchdot/open-golang/open"
 )
 
 var (
@@ -168,7 +169,16 @@ func main() {
 
 	if *proxy {
 		glog.Info("Starting to serve on localhost:8001")
-		server := kubecfg.NewProxyServer(*www, kubeClient)
+		if *openBrowser {
+			go func() {
+				time.Sleep(2 * time.Second)
+				open.Start("http://localhost:8001/static/")
+			}()
+		}
+		server, err := kubecfg.NewProxyServer(*www, clientConfig)
+		if err != nil {
+			glog.Fatalf("Error creating proxy server: %v", err)
+		}
 		glog.Fatal(server.Serve())
 	}
 
