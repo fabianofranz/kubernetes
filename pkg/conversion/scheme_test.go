@@ -21,10 +21,11 @@ import (
 	"flag"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/google/gofuzz"
+	"github.com/openshift/origin/Godeps/_workspace/src/github.com/google/gofuzz"
 )
 
 var fuzzIters = flag.Int("fuzz_iters", 50, "How many fuzzing iterations to do.")
@@ -215,6 +216,66 @@ func TestTypes(t *testing.T) {
 		for i := 0; i < *fuzzIters; i++ {
 			runTest(t, item)
 		}
+	}
+}
+
+func TestMultipleNames(t *testing.T) {
+	s := GetTestScheme()
+
+	obj, err := s.Decode([]byte(`{"myKindKey":"TestType3","myVersionKey":"v1","A":"value"}`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	internal := obj.(*TestType1)
+	if internal.A != "value" {
+		t.Fatalf("unexpected decoded object: %#v", internal)
+	}
+
+	out, err := s.EncodeToVersion(internal, "v1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(string(out), `"myKindKey":"TestType1"`) {
+		t.Errorf("unexpected encoded output: %s", string(out))
+	}
+}
+
+func TestKnownTypes(t *testing.T) {
+	s := GetTestScheme()
+	if len(s.KnownTypes("v2")) != 0 {
+		t.Errorf("should have no known types for v2")
+	}
+
+	types := s.KnownTypes("v1")
+	for _, s := range []string{"TestType1", "TestType2", "TestType3", "ExternalInternalSame"} {
+		if _, ok := types[s]; !ok {
+			t.Errorf("missing type %q", s)
+		}
+	}
+}
+
+func TestConvertToVersion(t *testing.T) {
+	s := GetTestScheme()
+	tt := &TestType1{A: "I'm not a pointer object"}
+	other, err := s.ConvertToVersion(tt, "v1")
+	if err != nil {
+		t.Fatalf("Failure: %v", err)
+	}
+	converted, ok := other.(*ExternalTestType1)
+	if !ok {
+		t.Fatalf("Got wrong type")
+	}
+	if tt.A != converted.A {
+		t.Fatalf("Failed to convert object correctly: %#v", converted)
+	}
+}
+
+func TestConvertToVersionErr(t *testing.T) {
+	s := GetTestScheme()
+	tt := TestType1{A: "I'm not a pointer object"}
+	_, err := s.ConvertToVersion(tt, "v1")
+	if err == nil {
+		t.Fatalf("unexpected non-error")
 	}
 }
 

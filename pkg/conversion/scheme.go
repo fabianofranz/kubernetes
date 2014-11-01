@@ -145,27 +145,52 @@ func (s *Scheme) Convert(in, out interface{}) error {
 	return s.converter.Convert(in, out, 0)
 }
 
-// metaInsertion provides a default implementation of MetaInsertionFactory.
-type metaInsertion struct {
-	Version string `json:"version,omitempty" yaml:"version,omitempty"`
-	Kind    string `json:"kind,omitempty" yaml:"kind,omitempty"`
+// ConvertToVersion attempts to convert an input object to its matching Kind in another
+// version within this scheme. Will return an error if the provided version does not
+// contain the inKind (or a mapping by name defined with AddKnownTypeWithName).
+func (s *Scheme) ConvertToVersion(in interface{}, outVersion string) (interface{}, error) {
+	t := reflect.TypeOf(in)
+	if t.Kind() != reflect.Ptr {
+		return nil, fmt.Errorf("only pointer types may be converted: %v", t)
+	}
+	t = t.Elem()
+	if t.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("only pointers to struct types may be converted: %v", t)
+	}
+
+	kinds, ok := s.typeToKind[t]
+	if !ok {
+		return nil, fmt.Errorf("%v cannot be converted into version %q", t, outVersion)
+	}
+	outKind := kinds[0]
+
+	inVersion, _, err := s.ObjectVersionAndKind(in)
+	if err != nil {
+		return nil, err
+	}
+
+	out, err := s.NewObject(outVersion, outKind)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.converter.Convert(in, out, 0, s.generateConvertMeta(inVersion, outVersion)); err != nil {
+		return nil, err
+	}
+
+	if err := s.SetVersionAndKind(outVersion, outKind, out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
 
-// Create should make a new object with two fields.
-// This object will be used to encode this metadata along with your
-// API objects, so the tags on the fields you use shouldn't conflict.
-func (metaInsertion) Create(version, kind string) interface{} {
-	m := metaInsertion{}
-	m.Version = version
-	m.Kind = kind
-	return &m
-}
-
-// Interpret should take the same type of object that Create creates.
-// It should return the version and kind information from this object.
-func (metaInsertion) Interpret(in interface{}) (version, kind string) {
-	m := in.(*metaInsertion)
-	return m.Version, m.Kind
+// generateConvertMeta constructs the meta value we pass to Convert.
+func (s *Scheme) generateConvertMeta(srcVersion, destVersion string) *Meta {
+	return &Meta{
+		SrcVersion:  srcVersion,
+		DestVersion: destVersion,
+	}
 }
 
 // DataVersionAndKind will return the APIVersion and Kind of the given wire-format
