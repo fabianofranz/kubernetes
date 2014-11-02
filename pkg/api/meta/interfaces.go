@@ -23,6 +23,7 @@ import (
 // VersionInterfaces contains the interfaces one should use for dealing with types of a particular version.
 type VersionInterfaces struct {
 	runtime.Codec
+	runtime.ObjectConvertor
 	MetadataAccessor
 }
 
@@ -85,6 +86,7 @@ type RESTMapping struct {
 	APIVersion string
 
 	runtime.Codec
+	runtime.ObjectConvertor
 	MetadataAccessor
 }
 
