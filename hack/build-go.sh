@@ -40,7 +40,7 @@ if [[ $# == 0 ]]; then
       cmd/proxy \
       cmd/apiserver \
       cmd/controller-manager \
-      cmd/kubelet cmd/kubecfg \
+      cmd/kubelet cmd/kubecfg cmd/kubectl \
       plugin/cmd/scheduler
 fi
 
