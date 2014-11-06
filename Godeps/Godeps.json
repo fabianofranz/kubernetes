@@ -11,6 +11,11 @@
 			"Rev": "7dda39b2e7d5e265014674c5af696ba4186679e9"
 		},
 		{
+			"ImportPath": "code.google.com/p/go.net/context",
+			"Comment": "null-144",
+			"Rev": "ad01a6fcc8a19d3a4478c836895ffe883bd2ceab"
+		},
+		{
 			"ImportPath": "code.google.com/p/go.net/html",
 			"Comment": "null-144",
 			"Rev": "ad01a6fcc8a19d3a4478c836895ffe883bd2ceab"
@@ -67,6 +72,14 @@
 		{
 			"ImportPath": "github.com/google/gofuzz",
 			"Rev": "aef70dacbc78771e35beb261bb3a72986adf7906"
+		},
+		{
+			"ImportPath": "github.com/spf13/cobra",
+			"Rev": "b1e90a7943957b51bb96a13b44b844475bcf95c0"
+		},
+		{
+			"ImportPath": "github.com/spf13/pflag",
+			"Rev": "463bdc838f2b35e9307e91d480878bda5fff7232"
 		},
 		{
 			"ImportPath": "github.com/stretchr/objx",

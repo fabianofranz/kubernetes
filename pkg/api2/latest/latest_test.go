@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"testing"
 
-	internal api "github.com/GoogleCloudPlatform/kubernetes/pkg/api2"
+	internal "github.com/GoogleCloudPlatform/kubernetes/pkg/api2"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api2/v1beta1"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api2/v1beta2"
 	util "github.com/GoogleCloudPlatform/kubernetes/pkg/util2"
