@@ -22,13 +22,14 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
+	"github.com/elazarl/goproxy"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 )
 
 func TestRoundTripAndNewConnection(t *testing.T) {
-
 	localhostPool := x509.NewCertPool()
 	if !localhostPool.AppendCertsFromPEM(localhostCert) {
 		t.Errorf("error setting up localhostCert pool")
@@ -41,6 +42,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 		serverUpgradeHeader    string
 		serverStatusCode       int
 		shouldError            bool
+		withProxy              bool
 	}{
 		"no headers": {
 			serverFunc:             httptest.NewServer,
@@ -115,6 +117,54 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 			serverStatusCode:       http.StatusSwitchingProtocols,
 			shouldError:            false,
 		},
+		"proxied http": {
+			serverFunc:             httptest.NewServer,
+			serverConnectionHeader: "Upgrade",
+			serverUpgradeHeader:    "SPDY/3.1",
+			withProxy:              true,
+			serverStatusCode:       http.StatusSwitchingProtocols,
+			shouldError:            false,
+		},
+		"proxied https (invalid hostname + InsecureSkipVerify)": {
+			serverFunc: func(h http.Handler) *httptest.Server {
+				cert, err := tls.X509KeyPair(exampleCert, exampleKey)
+				if err != nil {
+					t.Errorf("https (invalid hostname): proxy_test: %v", err)
+				}
+				ts := httptest.NewUnstartedServer(h)
+				ts.TLS = &tls.Config{
+					Certificates: []tls.Certificate{cert},
+				}
+				ts.StartTLS()
+				return ts
+			},
+			clientTLS:              &tls.Config{InsecureSkipVerify: true},
+			serverConnectionHeader: "Upgrade",
+			serverUpgradeHeader:    "SPDY/3.1",
+			withProxy:              true,
+			serverStatusCode:       http.StatusSwitchingProtocols,
+			shouldError:            false,
+		},
+		"proxied https (valid hostname + RootCAs)": {
+			serverFunc: func(h http.Handler) *httptest.Server {
+				cert, err := tls.X509KeyPair(localhostCert, localhostKey)
+				if err != nil {
+					t.Errorf("https (valid hostname): proxy_test: %v", err)
+				}
+				ts := httptest.NewUnstartedServer(h)
+				ts.TLS = &tls.Config{
+					Certificates: []tls.Certificate{cert},
+				}
+				ts.StartTLS()
+				return ts
+			},
+			clientTLS:              &tls.Config{RootCAs: localhostPool},
+			serverConnectionHeader: "Upgrade",
+			serverUpgradeHeader:    "SPDY/3.1",
+			withProxy:              true,
+			serverStatusCode:       http.StatusSwitchingProtocols,
+			shouldError:            false,
+		},
 	}
 
 	for k, testCase := range testCases {
@@ -154,7 +204,24 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 			t.Fatalf("%s: Error creating request: %s", k, err)
 		}
 
-		spdyTransport := NewRoundTripper(testCase.clientTLS)
+		spdyTransport := NewSpdyRoundTripper(testCase.clientTLS)
+
+		var proxierCalled bool
+		if testCase.withProxy {
+			proxyHandler := goproxy.NewProxyHttpServer()
+			proxy := testCase.serverFunc(proxyHandler)
+			spdyTransport.proxier = func(proxierReq *http.Request) (*url.URL, error) {
+				proxyURL, err := url.Parse(proxy.URL)
+				if err != nil {
+					return nil, err
+				}
+				proxierCalled = true
+				return proxyURL, nil
+			}
+			// TODO: Uncomment when fix #19254
+			// defer proxy.Close()
+		}
+
 		client := &http.Client{Transport: spdyTransport}
 
 		resp, err := client.Do(req)
@@ -199,6 +266,10 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 		}
 		if e, a := "hello", string(b[0:n]); e != a {
 			t.Fatalf("%s: expected '%s', got '%s'", k, e, a)
+		}
+
+		if testCase.withProxy && !proxierCalled {
+			t.Fatalf("%s: Expected to use a proxy but proxier in SpdyRoundTripper wasn't called")
 		}
 	}
 }

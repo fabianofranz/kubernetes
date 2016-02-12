@@ -53,6 +53,10 @@ type SpdyRoundTripper struct {
 
 	// Dialer is the dialer used to connect.  Used if non-nil.
 	Dialer *net.Dialer
+
+	// proxier knows which proxy to use given a request, defaults to http.ProxyFromEnvironment
+	// Used primarily for mocking the proxy discovery in tests.
+	proxier func(req *http.Request) (*url.URL, error)
 }
 
 // NewRoundTripper creates a new SpdyRoundTripper that will use
@@ -64,13 +68,16 @@ func NewRoundTripper(tlsConfig *tls.Config) httpstream.UpgradeRoundTripper {
 // NewSpdyRoundTripper creates a new SpdyRoundTripper that will use
 // the specified tlsConfig. This function is mostly meant for unit tests.
 func NewSpdyRoundTripper(tlsConfig *tls.Config) *SpdyRoundTripper {
-	return &SpdyRoundTripper{tlsConfig: tlsConfig}
+	return &SpdyRoundTripper{
+		tlsConfig: tlsConfig,
+		proxier:   http.ProxyFromEnvironment,
+	}
 }
 
 // dial dials the host specified by req, using TLS if appropriate, optionally
 // using a proxy server if one is configured via environment variables.
 func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
-	proxyURL, err := http.ProxyFromEnvironment(req)
+	proxyURL, err := s.proxier(req)
 	if err != nil {
 		return nil, err
 	}
@@ -120,6 +127,11 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 	// need to manually call Handshake() so we can call VerifyHostname() below
 	if err := tlsConn.Handshake(); err != nil {
 		return nil, err
+	}
+
+	// Return if we were configured to skip validation
+	if s.tlsConfig != nil && s.tlsConfig.InsecureSkipVerify {
+		return tlsConn, nil
 	}
 
 	if err := tlsConn.VerifyHostname(host); err != nil {
