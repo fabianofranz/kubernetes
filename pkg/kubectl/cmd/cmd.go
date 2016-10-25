@@ -302,6 +302,9 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			"__kubectl_get_namespaces",
 		)
 	}
+	if cmds.Flag("v") != nil {
+		cmds.Flag("v").Usage = "Set the level of log output to debug-level (0~4) or trace-level (5~10)"
+	}
 
 	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), out))
 	cmds.AddCommand(NewCmdVersion(f, out))
