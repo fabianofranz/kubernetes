@@ -223,7 +223,7 @@ __custom_func() {
 )
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
-func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, errOut io.Writer) *cobra.Command {
+func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
@@ -253,25 +253,25 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, errOut io.Writer) *
 		{
 			Message: "Basic Commands (Beginner):",
 			Commands: []*cobra.Command{
-				NewCmdCreate(f, out, errOut),
+				NewCmdCreate(f, out, err),
 				NewCmdExposeService(f, out),
-				NewCmdRun(f, in, out, errOut),
-				set.NewCmdSet(f, out, errOut),
+				NewCmdRun(f, in, out, err),
+				set.NewCmdSet(f, out, err),
 			},
 		},
 		{
 			Message: "Basic Commands (Intermediate):",
 			Commands: []*cobra.Command{
-				NewCmdGet(f, out, errOut),
-				NewCmdExplain(f, out, errOut),
-				NewCmdEdit(f, out, errOut),
-				NewCmdDelete(f, out, errOut),
+				NewCmdGet(f, out, err),
+				NewCmdExplain(f, out, err),
+				NewCmdEdit(f, out, err),
+				NewCmdDelete(f, out, err),
 			},
 		},
 		{
 			Message: "Deploy Commands:",
 			Commands: []*cobra.Command{
-				rollout.NewCmdRollout(f, out, errOut),
+				rollout.NewCmdRollout(f, out, err),
 				NewCmdRollingUpdate(f, out),
 				NewCmdScale(f, out),
 				NewCmdAutoscale(f, out),
@@ -282,30 +282,30 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, errOut io.Writer) *
 			Commands: []*cobra.Command{
 				NewCmdCertificate(f, out),
 				NewCmdClusterInfo(f, out),
-				NewCmdTop(f, out, errOut),
+				NewCmdTop(f, out, err),
 				NewCmdCordon(f, out),
 				NewCmdUncordon(f, out),
-				NewCmdDrain(f, out, errOut),
+				NewCmdDrain(f, out, err),
 				NewCmdTaint(f, out),
 			},
 		},
 		{
 			Message: "Troubleshooting and Debugging Commands:",
 			Commands: []*cobra.Command{
-				NewCmdDescribe(f, out, errOut),
+				NewCmdDescribe(f, out, err),
 				NewCmdLogs(f, out),
-				NewCmdAttach(f, in, out, errOut),
-				NewCmdExec(f, in, out, errOut),
-				NewCmdPortForward(f, out, errOut),
+				NewCmdAttach(f, in, out, err),
+				NewCmdExec(f, in, out, err),
+				NewCmdPortForward(f, out, err),
 				NewCmdProxy(f, out),
-				NewCmdCp(f, in, out, errOut),
-				auth.NewCmdAuth(f, out, errOut),
+				NewCmdCp(f, in, out, err),
+				auth.NewCmdAuth(f, out, err),
 			},
 		},
 		{
 			Message: "Advanced Commands:",
 			Commands: []*cobra.Command{
-				NewCmdApply(f, out, errOut),
+				NewCmdApply(f, out, err),
 				NewCmdPatch(f, out),
 				NewCmdReplace(f, out),
 				NewCmdConvert(f, out),
@@ -321,9 +321,9 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, errOut io.Writer) *
 		},
 	}
 
-	loadedPlugins, err := plugins.NewConfigDirPluginLoader().Load()
-	if err != nil {
-		fmt.Printf("Unable to load plugins due to: %v\n", err)
+	loadedPlugins, loadingErr := plugins.NewConfigDirPluginLoader().Load()
+	if loadingErr != nil {
+		fmt.Printf("Unable to load plugins due to: %v\n", loadingErr)
 	}
 
 	if len(loadedPlugins) > 0 {
@@ -341,22 +341,22 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, errOut io.Writer) *
 					env := os.Environ()
 
 					if plugin.Tunnel {
-						clientConfig, err := f.ClientConfig()
-						if err != nil {
-							glog.Fatal(err)
+						clientConfig, cfgErr := f.ClientConfig()
+						if cfgErr != nil {
+							glog.Fatal(cfgErr)
 						}
 
-						listener, err := plugins.ServePluginAPIProxy(clientConfig)
-						if err != nil {
-							glog.Fatal(err)
+						listener, cfgErr := plugins.ServePluginAPIProxy(clientConfig)
+						if cfgErr != nil {
+							glog.Fatal(cfgErr)
 						}
 						defer listener.Close()
 
 						env = append(env, fmt.Sprintf("KUBECTL_PLUGIN_API_HOST=%s", listener.Addr()))
 					}
 
-					err := plugin.Run(in, out, errOut, env, args...)
-					cmdutil.CheckErr(err)
+					pluginErr := plugin.Run(in, out, err, env, args...)
+					cmdutil.CheckErr(pluginErr)
 				},
 			})
 		}
@@ -395,7 +395,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, errOut io.Writer) *
 		)
 	}
 
-	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), out, errOut))
+	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), out, err))
 	cmds.AddCommand(NewCmdVersion(f, out))
 	cmds.AddCommand(NewCmdApiVersions(f, out))
 	cmds.AddCommand(NewCmdOptions(out))
