@@ -11,14 +11,17 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "helpers.go",
         "loader.go",
         "plugins.go",
         "runner.go",
     ],
     tags = ["automanaged"],
     deps = [
+        "//vendor/github.com/fatih/camelcase:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
     ],
 )

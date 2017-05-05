@@ -19,10 +19,14 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
@@ -61,7 +65,7 @@ func NewCmdPlugin(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Co
 	if len(loadedPlugins) > 0 {
 		pluginRunner := f.PluginRunner()
 		for _, p := range loadedPlugins {
-			cmd.AddCommand(NewCmdForPlugin(p, pluginRunner, in, out, err))
+			cmd.AddCommand(NewCmdForPlugin(f, p, pluginRunner, in, out, err))
 		}
 	}
 
@@ -69,28 +73,114 @@ func NewCmdPlugin(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Co
 }
 
 // NewCmdForPlugin creates a command capable of running the provided plugin.
-func NewCmdForPlugin(plugin *plugins.Plugin, runner plugins.PluginRunner, in io.Reader, out, errout io.Writer) *cobra.Command {
+func NewCmdForPlugin(f cmdutil.Factory, plugin *plugins.Plugin, runner plugins.PluginRunner, in io.Reader, out, errout io.Writer) *cobra.Command {
 	if !plugin.IsValid() {
 		return nil
 	}
 
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:     plugin.Name,
 		Short:   plugin.ShortDesc,
 		Long:    templates.LongDesc(plugin.LongDesc),
 		Example: templates.Examples(plugin.Example),
 		Run: func(cmd *cobra.Command, args []string) {
-			ctx := plugins.RunningContext{
-				In:         in,
-				Out:        out,
-				ErrOut:     errout,
-				Args:       args,
-				Env:        os.Environ(),
-				WorkingDir: plugin.Dir,
+			if len(plugin.Command) == 0 {
+				cmdutil.DefaultSubCommandRun(errout)(cmd, args)
+				return
 			}
-			if err := runner.Run(plugin, ctx); err != nil {
+
+			cfg, err := f.ClientConfig()
+			cmdutil.CheckErr(err)
+
+			runningEnvProvider := &plugins.MultiRunningEnvProvider{
+				&plugins.PluginCallerEnvProvider{},
+				&plugins.OSEnvProvider{},
+				&plugins.PluginDescriptorEnvProvider{
+					Plugin: plugin,
+				},
+				&flagsPluginEnvProvider{
+					cmd: cmd,
+				},
+				&factoryAttrsPluginEnvProvider{
+					factory: f,
+				},
+				&restClientConfigPluginEnvProvider{
+					cfg: cfg,
+				},
+			}
+
+			runningContext := plugins.RunningContext{
+				In:          in,
+				Out:         out,
+				ErrOut:      errout,
+				Args:        args,
+				EnvProvider: runningEnvProvider,
+				WorkingDir:  plugin.Dir,
+			}
+
+			if err := runner.Run(plugin, runningContext); err != nil {
 				cmdutil.CheckErr(err)
 			}
 		},
 	}
+
+	for _, childPlugin := range plugin.Tree {
+		cmd.AddCommand(NewCmdForPlugin(f, childPlugin, runner, in, out, errout))
+	}
+
+	return cmd
+}
+
+type flagsPluginEnvProvider struct {
+	cmd *cobra.Command
+}
+
+func (p *flagsPluginEnvProvider) Env() ([]string, error) {
+	prefix := "KUBECTL_PLUGINS_GLOBAL_FLAG_"
+	env := []string{}
+	p.cmd.Flags().VisitAll(func(flag *pflag.Flag) {
+		env = append(env, plugins.FlagToEnv(flag, prefix))
+	})
+	return env, nil
+}
+
+type factoryAttrsPluginEnvProvider struct {
+	factory cmdutil.Factory
+}
+
+func (p *factoryAttrsPluginEnvProvider) Env() ([]string, error) {
+	cmdNamespace, _, err := p.factory.DefaultNamespace()
+	if err != nil {
+		return []string{}, err
+	}
+	return []string{fmt.Sprintf("%s=%s", "KUBECTL_PLUGINS_CURRENT_NAMESPACE", cmdNamespace)}, nil
+}
+
+type restClientConfigPluginEnvProvider struct {
+	cfg *restclient.Config
+}
+
+func (p *restClientConfigPluginEnvProvider) Env() ([]string, error) {
+	prefix := "KUBECTL_PLUGINS_REST_CLIENT_CONFIG_"
+	env := []string{}
+	env = append(env, plugins.FieldToEnv("Host", p.cfg.Host, prefix))
+	env = append(env, plugins.FieldToEnv("APIPath", p.cfg.APIPath, prefix))
+	env = append(env, plugins.FieldToEnv("Prefix", p.cfg.Prefix, prefix))
+	env = append(env, plugins.FieldToEnv("Username", p.cfg.Username, prefix))
+	env = append(env, plugins.FieldToEnv("Password", p.cfg.Password, prefix))
+	env = append(env, plugins.FieldToEnv("BearerToken", p.cfg.BearerToken, prefix))
+	env = append(env, plugins.FieldToEnv("Impersonate.UserName", p.cfg.Impersonate.UserName, prefix))
+	env = append(env, plugins.FieldToEnv("Impersonate.Groups", strings.Join(p.cfg.Impersonate.Groups, ","), prefix))
+	env = append(env, plugins.FieldToEnv("Insecure", strconv.FormatBool(p.cfg.Insecure), prefix))
+	env = append(env, plugins.FieldToEnv("ServerName", p.cfg.ServerName, prefix))
+	env = append(env, plugins.FieldToEnv("CertFile", p.cfg.CertFile, prefix))
+	env = append(env, plugins.FieldToEnv("KeyFile", p.cfg.KeyFile, prefix))
+	env = append(env, plugins.FieldToEnv("CAFile", p.cfg.CAFile, prefix))
+	env = append(env, plugins.FieldToEnv("CertData", string(p.cfg.CertData), prefix))
+	env = append(env, plugins.FieldToEnv("KeyData", string(p.cfg.KeyData), prefix))
+	env = append(env, plugins.FieldToEnv("CAData", string(p.cfg.CAData), prefix))
+	env = append(env, plugins.FieldToEnv("UserAgent", p.cfg.UserAgent, prefix))
+	env = append(env, plugins.FieldToEnv("Timeout", p.cfg.Timeout.String(), prefix))
+	env = append(env, plugins.FieldToEnv("TimeoutMS", strconv.FormatInt(int64(p.cfg.Timeout/time.Millisecond), 10), prefix))
+	return env, nil
 }
