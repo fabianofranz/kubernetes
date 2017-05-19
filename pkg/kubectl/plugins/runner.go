@@ -17,7 +17,6 @@ limitations under the License.
 package plugins
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -39,7 +38,7 @@ type RunningContext struct {
 	Out         io.Writer
 	ErrOut      io.Writer
 	Args        []string
-	EnvProvider RunningEnvProvider
+	EnvProvider EnvProvider
 	WorkingDir  string
 }
 
@@ -67,73 +66,9 @@ func (r *ExecPluginRunner) Run(plugin *Plugin, ctx RunningContext) error {
 	if err != nil {
 		return err
 	}
-	cmd.Env = env
+	cmd.Env = env.Slice()
 	cmd.Dir = ctx.WorkingDir
 
 	glog.V(9).Infof("Running plugin %q as base command %q with args %v", plugin.Name, base, args)
 	return cmd.Run()
-}
-
-// RunningEnvProvider provides the environment (with entries in the KEY=VALUE form)
-// in which the plugin will run.
-type RunningEnvProvider interface {
-	Env() ([]string, error)
-}
-
-// MultiRunningEnvProvider is a RunningEnvProvider for multiple env providers, returns on first error.
-type MultiRunningEnvProvider []RunningEnvProvider
-
-func (p MultiRunningEnvProvider) Env() ([]string, error) {
-	env := []string{}
-	for _, provider := range p {
-		pEnv, err := provider.Env()
-		if err != nil {
-			return []string{}, err
-		}
-		env = append(env, pEnv...)
-	}
-	return env, nil
-}
-
-// PluginCallerEnvProvider provides env with the path to the caller binary (usually full path to 'kubectl').
-type PluginCallerEnvProvider struct{}
-
-func (p *PluginCallerEnvProvider) Env() ([]string, error) {
-	caller, err := os.Executable()
-	if err != nil {
-		return []string{}, err
-	}
-	return []string{fmt.Sprintf("%s=%s", "KUBECTL_PLUGINS_CALLER", caller)}, nil
-}
-
-// PluginDescriptorEnvProvider provides env vars with information about the running plugin.
-type PluginDescriptorEnvProvider struct {
-	Plugin *Plugin
-}
-
-func (p *PluginDescriptorEnvProvider) Env() ([]string, error) {
-	if p.Plugin == nil {
-		return []string{}, fmt.Errorf("plugin not present to extract env")
-	}
-	prefix := "KUBECTL_PLUGINS_DESCRIPTOR_"
-	env := []string{}
-	env = append(env, FieldToEnv("Name", p.Plugin.Name, prefix))
-	env = append(env, FieldToEnv("ShortDesc", p.Plugin.ShortDesc, prefix))
-	env = append(env, FieldToEnv("LongDesc", p.Plugin.LongDesc, prefix))
-	env = append(env, FieldToEnv("Example", p.Plugin.Example, prefix))
-	env = append(env, FieldToEnv("Command", p.Plugin.Command, prefix))
-	return env, nil
-}
-
-// OSEnvProvider provides current environment from the operating system.
-type OSEnvProvider struct{}
-
-func (p *OSEnvProvider) Env() ([]string, error) {
-	return os.Environ(), nil
-}
-
-type EmptyEnvProvider struct{}
-
-func (p *EmptyEnvProvider) Env() ([]string, error) {
-	return []string{}, nil
 }

@@ -19,14 +19,10 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
@@ -89,10 +85,7 @@ func NewCmdForPlugin(f cmdutil.Factory, plugin *plugins.Plugin, runner plugins.P
 				return
 			}
 
-			cfg, err := f.ClientConfig()
-			cmdutil.CheckErr(err)
-
-			runningEnvProvider := &plugins.MultiRunningEnvProvider{
+			envProvider := &plugins.MultiEnvProvider{
 				&plugins.PluginCallerEnvProvider{},
 				&plugins.OSEnvProvider{},
 				&plugins.PluginDescriptorEnvProvider{
@@ -104,9 +97,6 @@ func NewCmdForPlugin(f cmdutil.Factory, plugin *plugins.Plugin, runner plugins.P
 				&factoryAttrsPluginEnvProvider{
 					factory: f,
 				},
-				&restClientConfigPluginEnvProvider{
-					cfg: cfg,
-				},
 			}
 
 			runningContext := plugins.RunningContext{
@@ -114,7 +104,7 @@ func NewCmdForPlugin(f cmdutil.Factory, plugin *plugins.Plugin, runner plugins.P
 				Out:         out,
 				ErrOut:      errout,
 				Args:        args,
-				EnvProvider: runningEnvProvider,
+				EnvProvider: envProvider,
 				WorkingDir:  plugin.Dir,
 			}
 
@@ -135,9 +125,9 @@ type flagsPluginEnvProvider struct {
 	cmd *cobra.Command
 }
 
-func (p *flagsPluginEnvProvider) Env() ([]string, error) {
+func (p *flagsPluginEnvProvider) Env() (plugins.EnvList, error) {
 	prefix := "KUBECTL_PLUGINS_GLOBAL_FLAG_"
-	env := []string{}
+	env := plugins.EnvList{}
 	p.cmd.Flags().VisitAll(func(flag *pflag.Flag) {
 		env = append(env, plugins.FlagToEnv(flag, prefix))
 	})
@@ -148,39 +138,12 @@ type factoryAttrsPluginEnvProvider struct {
 	factory cmdutil.Factory
 }
 
-func (p *factoryAttrsPluginEnvProvider) Env() ([]string, error) {
+func (p *factoryAttrsPluginEnvProvider) Env() (plugins.EnvList, error) {
 	cmdNamespace, _, err := p.factory.DefaultNamespace()
 	if err != nil {
-		return []string{}, err
+		return plugins.EnvList{}, err
 	}
-	return []string{fmt.Sprintf("%s=%s", "KUBECTL_PLUGINS_CURRENT_NAMESPACE", cmdNamespace)}, nil
-}
-
-type restClientConfigPluginEnvProvider struct {
-	cfg *restclient.Config
-}
-
-func (p *restClientConfigPluginEnvProvider) Env() ([]string, error) {
-	prefix := "KUBECTL_PLUGINS_REST_CLIENT_CONFIG_"
-	env := []string{}
-	env = append(env, plugins.FieldToEnv("Host", p.cfg.Host, prefix))
-	env = append(env, plugins.FieldToEnv("APIPath", p.cfg.APIPath, prefix))
-	env = append(env, plugins.FieldToEnv("Prefix", p.cfg.Prefix, prefix))
-	env = append(env, plugins.FieldToEnv("Username", p.cfg.Username, prefix))
-	env = append(env, plugins.FieldToEnv("Password", p.cfg.Password, prefix))
-	env = append(env, plugins.FieldToEnv("BearerToken", p.cfg.BearerToken, prefix))
-	env = append(env, plugins.FieldToEnv("Impersonate.UserName", p.cfg.Impersonate.UserName, prefix))
-	env = append(env, plugins.FieldToEnv("Impersonate.Groups", strings.Join(p.cfg.Impersonate.Groups, ","), prefix))
-	env = append(env, plugins.FieldToEnv("Insecure", strconv.FormatBool(p.cfg.Insecure), prefix))
-	env = append(env, plugins.FieldToEnv("ServerName", p.cfg.ServerName, prefix))
-	env = append(env, plugins.FieldToEnv("CertFile", p.cfg.CertFile, prefix))
-	env = append(env, plugins.FieldToEnv("KeyFile", p.cfg.KeyFile, prefix))
-	env = append(env, plugins.FieldToEnv("CAFile", p.cfg.CAFile, prefix))
-	env = append(env, plugins.FieldToEnv("CertData", string(p.cfg.CertData), prefix))
-	env = append(env, plugins.FieldToEnv("KeyData", string(p.cfg.KeyData), prefix))
-	env = append(env, plugins.FieldToEnv("CAData", string(p.cfg.CAData), prefix))
-	env = append(env, plugins.FieldToEnv("UserAgent", p.cfg.UserAgent, prefix))
-	env = append(env, plugins.FieldToEnv("Timeout", p.cfg.Timeout.String(), prefix))
-	env = append(env, plugins.FieldToEnv("TimeoutMS", strconv.FormatInt(int64(p.cfg.Timeout/time.Millisecond), 10), prefix))
-	return env, nil
+	return plugins.EnvList{
+		{"KUBECTL_PLUGINS_CURRENT_NAMESPACE", cmdNamespace},
+	}, nil
 }
